@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import Hand from './Hand';
 import { Card, generateDeck, serializeCard, draw } from './game';
-
-
+import CardDisplay from './Card';
+import styles from './App.module.css';
 
 type GameState = {
   deck: Array<Card>;
   discard: Array<Card>;
   playerHand: Array<Card>,
   compHand: Array<Card>,
+  turn: 'player' | 'comp';
 }
 
 function emptyGameState(): GameState {
@@ -16,11 +17,13 @@ function emptyGameState(): GameState {
   const discard = draw(deck, 1);
   const playerHand = draw(deck, 10);
   const compHand = draw(deck, 10);
+  const turn = 'player';
   return {
     deck,
     discard,
     playerHand,
     compHand,
+    turn,
   }
 }
 
@@ -31,6 +34,8 @@ function App() {
   const [discard] = useState(gameState.discard);
   const [playerHand] = useState(gameState.playerHand);
   const [compHand] = useState(gameState.compHand);
+  const [turn] = useState(gameState.turn);
+  const [action, setAction] = useState('');
 
   useEffect(() => {
     localStorage.setItem('gameState', JSON.stringify({
@@ -38,34 +43,48 @@ function App() {
       discard,
       playerHand,
       compHand,
+      turn,
     }));
-  }, [deck, discard, playerHand, compHand]);
+  }, [deck, discard, playerHand, compHand, turn]);
+
+  const resetAction = () => setAction('');
 
   return (
-    <div className="App">
-      <header className="App-header">
-        Card game
-      </header>
+    <div className={styles.game}>
+      <div className={styles.section}>
+        <div>
+          <strong>Whose turn?</strong>
+          <p>{turn}</p>
+        </div>
+      </div>
 
-      <h3>Computer Hand</h3>
-      <Hand hand={compHand} />
+      <div className={styles.section}>
+        <div>
+          <strong>Computer Hand</strong>
+          <Hand hand={compHand} />
+        </div>
+      </div>
 
-      <h3>Player Hand</h3>
-      <Hand hand={playerHand} />
+      <div className={styles.section}>
+        <div>
+          <strong>Deck</strong>
+          <div className={styles.deck}></div>
+        </div>
 
-      <h3>Discard</h3>
-      <ul>
-        {discard.map(card => (
-          <li key={serializeCard(card)}>{serializeCard(card)}</li>
-        ))}
-      </ul>
+        <div>
+          <strong>Discard</strong>
+          {discard.map((card, i) => (
+            <CardDisplay mouseEnter={() => { }} mouseOut={() => { }} key={serializeCard(card)} card={card} />
+          ))}
+        </div>
+      </div>
 
-      {/* <h3>Deck</h3> */}
-      {/* <ol>
-        {deck.map(card => (
-          <li key={serializeCard(card)}>{serializeCard(card)}</li>
-        ))}
-      </ol> */}
+      <div className={styles.section}>
+        <div>
+          <strong>Player Hand</strong>
+          <Hand hand={playerHand} />
+        </div>
+      </div>
     </div>
   );
 }

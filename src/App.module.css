@@ -1,0 +1,17 @@
+.game {
+  font-size: 12px;
+}
+
+.section {
+  border-bottom: 2px solid black;
+  padding: 10px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+}
+
+.deck {
+  composes: card from './Card.module.css';
+  background-color: salmon;
+  cursor: pointer;
+}

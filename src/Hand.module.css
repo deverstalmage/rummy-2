@@ -7,3 +7,7 @@
 .group {
   padding: 10px;
 }
+
+.group>* {
+  margin-right: -10px;
+}

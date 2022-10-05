@@ -8,16 +8,16 @@ export default function HandComponent({ hand }: { hand: Array<Card> }) {
   return (
     <div>
       <div className={styles.groups}>
-        {groups.map(group => (
+        {groups.map((group, i) => (
           <div className={styles.group} key={JSON.stringify(group)}>
             {group.map(card => (
-              <CardDisplay key={serializeCard(card)} card={card} />
+              <CardDisplay mouseEnter={() => { }} mouseOut={() => { }} key={serializeCard(card)} card={card} />
             ))}
           </div>
         ))}
         <div className={styles.group}>
-          {deadwood.map(card => (
-            <CardDisplay key={serializeCard(card)} card={card} />
+          {deadwood.map((card, i) => (
+            <CardDisplay mouseEnter={() => { }} mouseOut={() => { }} key={serializeCard(card)} card={card} />
           ))}
         </div>
       </div>

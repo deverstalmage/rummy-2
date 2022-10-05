@@ -6,4 +6,11 @@
   border-radius: 10px;
   line-height: 100px;
   text-align: center;
+  background-color: white;
+  box-shadow: 1px 1px 3px #333;
+  cursor: default;
+}
+
+.clickable {
+  cursor: pointer;
 }
