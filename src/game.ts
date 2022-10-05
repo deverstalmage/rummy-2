@@ -1,10 +1,12 @@
-function render(txt) {
-  console.log(JSON.stringify(txt, undefined, 2));
-}
-
 export type Card = {
   value: number;
   suit: 'club' | 'spade' | 'heart' | 'diamond';
+}
+
+
+export type Hand = {
+  groups: Array<Array<Card>>;
+  deadwood: Array<Card>;
 }
 
 function displayCard(c) {
@@ -50,12 +52,12 @@ function displayCard(c) {
 
 export const serializeCard = displayCard;
 
-function displayHand(hand) {
-  return {
-    groups: hand.groups.map(group => group.map(c => displayCard(c))),
-    deadwood: hand.deadwood.map(d => displayCard(d)),
-  };
-}
+// function displayHand(hand) {
+//   return {
+//     groups: hand.groups.map(group => group.map(c => displayCard(c))),
+//     deadwood: hand.deadwood.map(d => displayCard(d)),
+//   };
+// }
 
 export function generateDeck(shuffled = true) {
   const deck: Array<Card> = [];
@@ -193,11 +195,6 @@ function restOfHand(cards, hand) {
 
 function findAll(hand) {
   return [...findAllRuns(hand), ...findAllSets(hand)];
-}
-
-type Hand = {
-  groups: Array<Array<Card>>;
-  deadwood: Array<Card>;
 }
 
 function findHands(hand, hands: Array<Hand> = [], g: Array<Array<Card>> = []): Hand {

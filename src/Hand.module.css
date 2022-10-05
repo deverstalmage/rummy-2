@@ -1,0 +1,9 @@
+.group,
+.groups {
+  display: flex;
+  flex-direction: row;
+}
+
+.group {
+  padding: 10px;
+}
