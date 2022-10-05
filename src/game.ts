@@ -2,9 +2,17 @@ function render(txt) {
   console.log(JSON.stringify(txt, undefined, 2));
 }
 
+export type Card = {
+  value: number;
+  suit: 'club' | 'spade' | 'heart' | 'diamond';
+}
+
 function displayCard(c) {
   let val;
   switch (c.value) {
+    case 1:
+      val = 'A';
+      break;
     case 11:
       val = 'J';
       break;
@@ -32,10 +40,15 @@ function displayCard(c) {
     case 'diamond':
       s = '♦️';
       break;
+    default:
+      s = '';
+      break;
   }
 
   return `${val}${s}`;
 }
+
+export const serializeCard = displayCard;
 
 function displayHand(hand) {
   return {
@@ -44,32 +57,35 @@ function displayHand(hand) {
   };
 }
 
-const deck = [];
-for (let i = 1; i <= 13; i++) {
-  deck.push({
-    value: i,
-    suit: 'spade'
-  });
-  deck.push({
-    value: i,
-    suit: 'club'
-  });
-  deck.push({
-    value: i,
-    suit: 'heart'
-  });
-  deck.push({
-    value: i,
-    suit: 'diamond'
-  });
+export function generateDeck(shuffled = true) {
+  const deck: Array<Card> = [];
+  for (let i = 1; i <= 13; i++) {
+    deck.push({
+      value: i,
+      suit: 'spade'
+    });
+    deck.push({
+      value: i,
+      suit: 'club'
+    });
+    deck.push({
+      value: i,
+      suit: 'heart'
+    });
+    deck.push({
+      value: i,
+      suit: 'diamond'
+    });
+  }
+
+  return shuffled ? deck.slice().sort((a, b) => 0.5 - Math.random()) : deck.slice();
 }
 
-const shuffledDeck = deck.slice().sort((a, b) => 0.5 - Math.random());
-
-function draw(n) {
-  const r = [];
+export function draw(deck: Array<Card>, n: number) {
+  const r: Array<Card> = [];
   for (let i = 0; i < n; i++) {
-    r.push(shuffledDeck.pop());
+    const c = deck.pop();
+    if (c) r.push(c);
   }
   return r;
 }
@@ -99,7 +115,7 @@ function sortedCards(cs) {
 function findAllRuns(hand) {
   let rest = sortedCards(hand).reverse();
 
-  const runs = [];
+  const runs: Array<Array<Card>> = [];
 
   for (const c of rest) {
 
@@ -133,10 +149,10 @@ function findAllRuns(hand) {
 function findAllSets(hand) {
 
   let h = hand.slice();
-  const sets = [];
+  const sets: Array<Array<Card>> = [];
 
   for (const c of h) {
-    const matches = h.filter(f => f.value === c.value);
+    const matches: Array<Card> = h.filter(f => f.value === c.value);
     const rest = h.filter(f => f.value !== c.value);
 
     if (matches.length >= 3) {
@@ -179,9 +195,13 @@ function findAll(hand) {
   return [...findAllRuns(hand), ...findAllSets(hand)];
 }
 
+type Hand = {
+  groups: Array<Array<Card>>;
+  deadwood: Array<Card>;
+}
 
-function findHands(hand, hands = [], g = []) {
-  const groups = findAll(hand);
+function findHands(hand, hands: Array<Hand> = [], g: Array<Array<Card>> = []): Hand {
+  const groups: Array<Array<Card>> = findAll(hand);
   for (const group of groups) {
     findHands(restOfHand(group, hand), hands, [...g, group])
   }
@@ -198,19 +218,19 @@ function findHands(hand, hands = [], g = []) {
 
 const eqSet = (xs, ys) => xs.size === ys.size && [...xs].every((x) => ys.has(x));
 
-function getHandsBeforeDiscard(cards) {
-  const hands = [];
-  findHands(cards, hands);
+// function getHandsBeforeDiscard(cards) {
+//   const hands: Array<Hand> = [];
+//   findHands(cards, hands);
 
-  const u = new Map();
-  hands.filter(f => f.deadwood.length > 0).forEach(hand => {
-    const s = new Set(hand.deadwood);
-    if (![...u.keys()].find(h => eqSet(h, s))) {
-      u.set(s, hand);
-    }
-  })
-  return [...u.values()];
-}
+//   const u = new Map();
+//   hands.filter(f => f.deadwood.length > 0).forEach(hand => {
+//     const s = new Set(hand.deadwood);
+//     if (![...u.keys()].find(h => eqSet(h, s))) {
+//       u.set(s, hand);
+//     }
+//   })
+//   return [...u.values()];
+// }
 
 function highestValueCard(cards) {
   const c = cards.slice();
@@ -229,7 +249,7 @@ function removeHighestValueCard(cards) {
 }
 
 function leastDeadwoodBeforeDiscard(cards) {
-  const hands = [];
+  const hands: Array<Hand> = [];
   findHands(cards, hands);
 
   const u = new Map();
@@ -242,11 +262,11 @@ function leastDeadwoodBeforeDiscard(cards) {
   return [...u.values()].sort((a, b) => totalValue(a.deadwood) - totalValue(b.deadwood))[0];
 }
 
-function calcDeadwood(cards) {
-  const hands = [];
+export function calcDeadwood(cards): Hand {
+  const hands: Array<Hand> = [];
   findHands(cards, hands);
 
-  const u = new Map();
+  const u: Map<Set<Card>, Hand> = new Map();
   hands.forEach(hand => {
     const s = new Set(hand.deadwood);
     if (![...u.keys()].find(h => eqSet(h, s))) {
@@ -257,14 +277,14 @@ function calcDeadwood(cards) {
   return [...u.values()].sort((a, b) => totalValue(a.deadwood) - totalValue(b.deadwood))[0];
 }
 
-function bestDiscard(deadwood, discarded) {
+export function bestDiscard(deadwood, discarded) {
   const highValueCard = highestValueCard(deadwood);
   const highestValueCards = deadwood.filter(f => cardValue(f) === cardValue(highValueCard));
-  const discardCandidates = [];
+  const discardCandidates: Array<Card> = [];
 
   for (const h of highestValueCards) {
     if (discarded.length > 1) {
-      const possibleHands = [];
+      const possibleHands: Array<Hand> = [];
       findHands([...discarded, h], possibleHands);
       if (possibleHands.flatMap(h => h.groups).length > 0) {
         discardCandidates.push(h)
@@ -283,7 +303,7 @@ function bestDiscard(deadwood, discarded) {
   return discardCandidates.length > 0 ? discardCandidates[0] : highestValueCards[0];
 }
 
-function shouldDraw(currentHand, drawCard) {
+export function shouldDraw(currentHand, drawCard) {
   const newDeadwoodValue = totalValue(removeHighestValueCard(leastDeadwoodBeforeDiscard([...currentHand, drawCard]).deadwood));
   const currentDeadwoodValue = totalValue(calcDeadwood(currentHand).deadwood);
 
@@ -292,52 +312,46 @@ function shouldDraw(currentHand, drawCard) {
 
 
 
-const testHand = [
-  { value: 1, suit: 'spade' },
-  { value: 1, suit: 'club' },
-  { value: 1, suit: 'diamond' },
-  { value: 1, suit: 'heart' },
-  { value: 2, suit: 'club' },
-  { value: 2, suit: 'diamond' },
-  { value: 2, suit: 'heart' },
-  { value: 3, suit: 'club' },
-  { value: 3, suit: 'diamond' },
-  { value: 3, suit: 'heart' },
-];
+// const testHand = [
+//   { value: 1, suit: 'spade' },
+//   { value: 1, suit: 'club' },
+//   { value: 1, suit: 'diamond' },
+//   { value: 1, suit: 'heart' },
+//   { value: 2, suit: 'club' },
+//   { value: 2, suit: 'diamond' },
+//   { value: 2, suit: 'heart' },
+//   { value: 3, suit: 'club' },
+//   { value: 3, suit: 'diamond' },
+//   { value: 3, suit: 'heart' },
+// ];
 
+// function run() {
+//   const draw = (n) => [];
+//   const compHand = draw(10);
+//   const discard = draw(1);
+//   const topOfDiscard = discard[discard.length - 1];
+//   render('Comp Hand');
+//   render(displayHand(calcDeadwood(compHand)));
+//   render(`Top of Discard: ${displayCard(topOfDiscard)}`);
+//   render(`All discarded: ${discard.map(d => displayCard(d)).reverse()}`);
 
+//   const drawFromDiscard = shouldDraw(compHand, topOfDiscard);
+//   render(`Should take from discard? ${drawFromDiscard ? 'Yes' : 'No'}`);
 
+//   const cardDrawn = drawFromDiscard ? discard.pop() : shuffledDeck.pop();
+//   render(`Drawing: ${displayCard(cardDrawn)}`);
 
+//   let newCompHand = [...compHand, cardDrawn];
+//   const discarded = bestDiscard(leastDeadwoodBeforeDiscard(newCompHand).deadwood, discard);
+//   newCompHand = newCompHand.filter(f => f !== discarded);
+//   discard.push(discarded);
+//   render(`Discarding: ${displayCard(discarded)}`);
 
+//   render('New comp hand');
+//   render(displayHand(calcDeadwood(newCompHand)));
 
-const compHand = draw(10);
-const pHand = draw(10);
-const discard = draw(1);
-const topOfDiscard = discard[discard.length - 1];
-
-
-render('Comp Hand');
-render(displayHand(calcDeadwood(compHand)));
-render(`Top of Discard: ${displayCard(topOfDiscard)}`);
-render(`All discarded: ${discard.map(d => displayCard(d)).reverse()}`);
-
-const drawFromDiscard = shouldDraw(compHand, topOfDiscard);
-render(`Should take from discard? ${drawFromDiscard ? 'Yes' : 'No'}`);
-
-const cardDrawn = drawFromDiscard ? discard.pop() : shuffledDeck.pop();
-render(`Drawing: ${displayCard(cardDrawn)}`);
-
-let newCompHand = [...compHand, cardDrawn];
-const discarded = bestDiscard(leastDeadwoodBeforeDiscard(newCompHand).deadwood, discard);
-newCompHand = newCompHand.filter(f => f !== discarded);
-discard.push(discarded);
-render(`Discarding: ${displayCard(discarded)}`);
-
-render('New comp hand');
-render(displayHand(calcDeadwood(newCompHand)));
-
-const canKnock = totalValue(calcDeadwood(newCompHand).deadwood) <= 10;
-render(`Knock? ${canKnock ? 'Yes' : 'No'}`);
-
+//   const canKnock = totalValue(calcDeadwood(newCompHand).deadwood) <= 10;
+//   render(`Knock? ${canKnock ? 'Yes' : 'No'}`);
+// }
 
 
