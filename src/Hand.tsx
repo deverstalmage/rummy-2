@@ -11,8 +11,8 @@ export default function HandComponent({
 }: {
   hand: Array<Card>;
   noClick?: boolean;
-  onMouseEnterCard?: MouseEventHandler<HTMLDivElement>;
-  onMouseOutCard?: MouseEventHandler<HTMLDivElement>;
+  onMouseEnterCard?: (card: Card) => void;
+  onMouseOutCard?: (card: Card) => void;
 }) {
   const { groups, deadwood }: Hand = calcDeadwood(hand);
   return (
@@ -24,7 +24,7 @@ export default function HandComponent({
               <CardDisplay
                 notClickable={noClick}
                 mouseEnter={() => onMouseEnterCard(card)}
-                mouseOut={() => {}}
+                mouseOut={() => onMouseOutCard(card)}
                 key={serializeCard(card)}
                 card={card}
               />
@@ -37,8 +37,8 @@ export default function HandComponent({
             .map((card, i) => (
               <CardDisplay
                 notClickable={noClick}
-                mouseEnter={() => {}}
-                mouseOut={() => {}}
+                mouseEnter={() => onMouseEnterCard(card)}
+                mouseOut={() => onMouseOutCard(card)}
                 key={serializeCard(card)}
                 card={card}
               />

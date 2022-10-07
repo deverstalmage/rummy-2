@@ -19,3 +19,8 @@
   background-color: salmon;
   cursor: pointer;
 }
+
+.log {
+  height: 50px;
+  overflow-y: scroll;
+}
