@@ -1,26 +1,50 @@
-import React from 'react';
-import { Card, Hand, calcDeadwood, serializeCard } from './game';
-import CardDisplay from './Card';
-import styles from './Hand.module.css';
+import React, { MouseEventHandler } from "react";
+import { Card, Hand, calcDeadwood, serializeCard, sortedCards } from "./game";
+import CardDisplay from "./Card";
+import styles from "./Hand.module.css";
 
-export default function HandComponent({ hand }: { hand: Array<Card> }) {
+export default function HandComponent({
+  hand,
+  noClick = false,
+  onMouseEnterCard = () => {},
+  onMouseOutCard = () => {},
+}: {
+  hand: Array<Card>;
+  noClick?: boolean;
+  onMouseEnterCard?: MouseEventHandler<HTMLDivElement>;
+  onMouseOutCard?: MouseEventHandler<HTMLDivElement>;
+}) {
   const { groups, deadwood }: Hand = calcDeadwood(hand);
   return (
     <div>
       <div className={styles.groups}>
         {groups.map((group, i) => (
           <div className={styles.group} key={JSON.stringify(group)}>
-            {group.map(card => (
-              <CardDisplay mouseEnter={() => { }} mouseOut={() => { }} key={serializeCard(card)} card={card} />
+            {group.map((card) => (
+              <CardDisplay
+                notClickable={noClick}
+                mouseEnter={() => onMouseEnterCard(card)}
+                mouseOut={() => {}}
+                key={serializeCard(card)}
+                card={card}
+              />
             ))}
           </div>
         ))}
         <div className={styles.group}>
-          {deadwood.map((card, i) => (
-            <CardDisplay mouseEnter={() => { }} mouseOut={() => { }} key={serializeCard(card)} card={card} />
-          ))}
+          {sortedCards(deadwood)
+            .reverse()
+            .map((card, i) => (
+              <CardDisplay
+                notClickable={noClick}
+                mouseEnter={() => {}}
+                mouseOut={() => {}}
+                key={serializeCard(card)}
+                card={card}
+              />
+            ))}
         </div>
       </div>
     </div>
-  )
+  );
 }

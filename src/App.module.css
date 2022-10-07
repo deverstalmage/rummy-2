@@ -10,8 +10,12 @@
   justify-content: space-evenly;
 }
 
+.section > * {
+  min-width: 200px;
+}
+
 .deck {
-  composes: card from './Card.module.css';
+  composes: card from "./Card.module.css";
   background-color: salmon;
   cursor: pointer;
 }
