@@ -19,7 +19,6 @@ type GameState = {
   compHand: Array<Card>;
   turn: "player" | "comp";
   phase: "draw" | "discard" | "maybeKnock" | "goOut";
-  log: Array<string>;
 };
 
 function emptyGameState(): GameState {
@@ -29,7 +28,6 @@ function emptyGameState(): GameState {
   const compHand = draw(deck, 10);
   const turn = "player";
   const phase = "draw";
-  const log = ["Player's turn", "Draw phase"];
   return {
     deck,
     discard,
@@ -37,7 +35,6 @@ function emptyGameState(): GameState {
     compHand,
     turn,
     phase,
-    log,
   };
 }
 
@@ -53,12 +50,19 @@ function App() {
   const [turn, setTurn] = useState(gameState.turn);
   const [action, setAction] = useState("");
   const [phase, setPhase] = useState(gameState.phase);
-  const [logLines, setLogLines] = useState(gameState.log);
 
   const playerCanDraw = phase === "draw" && turn === "player";
   const playerCanDiscard = phase === "discard" && turn === "player";
 
-  const log = (newLine: string) => setLogLines([...logLines, newLine]);
+  const log = (newLine: string) => {
+    const buffer = document.getElementById("log");
+
+    if (buffer) {
+      const li = document.createElement("li");
+      li.textContent = newLine;
+      buffer.appendChild(li);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem(
@@ -70,49 +74,73 @@ function App() {
         compHand,
         turn,
         phase,
-        log: logLines,
       })
     );
     const buffer = document.getElementById("log");
     if (buffer) buffer.scrollTop = buffer.scrollHeight;
-  }, [deck, discard, playerHand, compHand, turn, phase, logLines]);
+  }, [deck, discard, playerHand, compHand, turn, phase]);
 
   const resetAction = () => setAction("");
 
+  const playerHasGin = calcDeadwood(playerHand).deadwood.length === 0;
+
   const scoreAndGoOut = () => {
     setPhase("goOut");
+
     const playerScore = totalValue(
       calcDeadwood([
         ...calcDeadwood(playerHand).deadwood,
         ...calcDeadwood(compHand).groups.flatMap((c) => c),
       ]).deadwood
     );
+
     const compScore = totalValue(
       calcDeadwood([
         ...calcDeadwood(compHand).deadwood,
         ...calcDeadwood(playerHand).groups.flatMap((c) => c),
       ]).deadwood
     );
+
     log(`${turn} is going out, round end.`);
-    log(`Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`);
 
     //undercut?
     const undercut =
       turn === "player" ? playerScore >= compScore : compScore >= playerScore;
 
     if (turn === "player") {
-      if (undercut) {
+      if (playerHasGin) {
+        const points = totalValue(calcDeadwood(compHand).deadwood);
+        if (playerHand.length === 11) {
+          log("Big gin!");
+          log(`Player wins and gains ${points} + 31 = ${points + 31} points!`);
+        } else {
+          log("Gin!");
+          log(`Player wins and gains ${points} + 25 = ${points + 25} points!`);
+        }
+      } else if (undercut) {
         log("Player was undercut!");
         log(
           `Comp wins the hand and gains ${playerScore - compScore + 25} points`
         );
       } else {
         log(
+          `Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`
+        );
+        log(
           `Player wins the hand, and gains ${compScore - playerScore} points`
         );
       }
     } else {
-      if (undercut) {
+      if (calcDeadwood(compHand).deadwood.length === 0) {
+        const points = totalValue(calcDeadwood(playerHand).deadwood);
+        if (compHand.length === 11) {
+          log("Big gin!");
+          log(`Comp wins and gains ${points} + 31 = ${points + 31} points!`);
+        } else {
+          log("Gin!");
+          log(`Comp wins and gains ${points} + 25 = ${points + 25} points!`);
+        }
+      } else if (undercut) {
         log("Comp was undercut!");
         log(
           `Player wins the hand and gains ${
@@ -120,6 +148,9 @@ function App() {
           } points`
         );
       } else {
+        log(
+          `Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`
+        );
         log(`Comp wins the hand, and gains ${playerScore - compScore} points`);
       }
     }
@@ -135,12 +166,10 @@ function App() {
 
         // check for big gin
         if (calcDeadwood(newHand).deadwood.length === 0) {
-          log("Big gin!");
-          scoreAndGoOut();
+          setPhase("maybeKnock");
+        } else {
+          setPhase("discard");
         }
-
-        log("Player discard phase");
-        setPhase("discard");
       }
     }
   };
@@ -150,26 +179,25 @@ function App() {
 
   const playerDiscard = (card) => {
     if (playerCanDiscard) {
+      alert(`Player discarded ${serializeCard(card)}`);
       log(`Player discarded ${serializeCard(card)}`);
       const newHand = playerHand.filter((c) => c !== card);
       setPlayerHand(newHand);
       setDiscard([...discard, card]);
 
       if (totalValue(calcDeadwood(newHand).deadwood) <= 10) {
-        log("Knock?");
         setPhase("maybeKnock");
       } else {
-        setPhase("draw");
-        setTurn("comp");
+        computerTurn();
       }
     }
   };
 
-  const knock = () => {
-    scoreAndGoOut();
+  const computerTurn = () => {
+    log("Computer's turn");
+    setTurn("comp");
+    setPhase("draw");
   };
-
-  const computerTurn = () => {};
 
   const reload = () => {
     localStorage.removeItem("gameState");
@@ -201,11 +229,7 @@ function App() {
 
         <div>
           <strong>Log:</strong>
-          <ul className={styles.log} id="log">
-            {logLines.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
+          <ul className={styles.log} id="log"></ul>
         </div>
       </div>
 
@@ -248,8 +272,14 @@ function App() {
 
       {phase === "maybeKnock" && (
         <div className={styles.section}>
-          <button onClick={knock}>Knock</button>
-          <button onClick={computerTurn}>Key Playing</button>
+          <button onClick={scoreAndGoOut}>
+            {playerHasGin && playerHand.length === 11
+              ? "Big Gin!!"
+              : playerHasGin
+              ? "Gin!"
+              : "Knock?"}
+          </button>
+          <button onClick={computerTurn}>Keep Playing</button>
         </div>
       )}
 
