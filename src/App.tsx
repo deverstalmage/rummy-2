@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Hand from "./Hand";
 import { Card, generateDeck, serializeCard, draw } from "./game";
 import CardDisplay from "./Card";
@@ -40,13 +40,23 @@ function App() {
     ? (JSON.parse(serializedGameState) as GameState)
     : emptyGameState();
   const [deck] = useState(gameState.deck);
-  const [discard] = useState(gameState.discard);
+  const [discard, setDiscard] = useState(gameState.discard);
   const [playerHand, setPlayerHand] = useState(gameState.playerHand);
   const [compHand] = useState(gameState.compHand);
   const [turn] = useState(gameState.turn);
   const [action, setAction] = useState("");
-  const [phase] = useState(gameState.phase);
+  const [phase, setPhase] = useState(gameState.phase);
   const [logLines, setLogLines] = useState(gameState.log);
+
+  const playerCanDraw = phase === "draw" && turn === "player";
+  const playerCanDiscard = phase === "discard" && turn === "player";
+
+  const log = useCallback(
+    (newLine: string) => {
+      setLogLines([...logLines, newLine]);
+    },
+    [logLines]
+  );
 
   useEffect(() => {
     localStorage.setItem(
@@ -63,19 +73,50 @@ function App() {
     );
     const buffer = document.getElementById("log");
     if (buffer) buffer.scrollTop = buffer.scrollHeight;
-  }, [deck, discard, playerHand, compHand, turn, phase, logLines]);
+
+    if (playerHand.length > 10 && playerCanDraw) {
+      log("Player discard phase");
+      setPhase("discard");
+    }
+  }, [
+    deck,
+    discard,
+    playerHand,
+    compHand,
+    turn,
+    phase,
+    logLines,
+    playerCanDraw,
+    log,
+  ]);
 
   const resetAction = () => setAction("");
 
-  const log = (newLine: string) => {
-    setLogLines([...logLines, newLine]);
+  const playerDeckDraw = () => {
+    if (playerCanDraw) {
+      const drawnCard = deck.pop();
+      if (drawnCard) {
+        log(`Player drew ${serializeCard(drawnCard)} from the deck`);
+        setPlayerHand([...playerHand, drawnCard]);
+      }
+    }
   };
 
-  const playerDraw = () => {
-    const drawnCard = deck.pop();
-    if (drawnCard) {
-      log(`Player drew ${serializeCard(drawnCard)}`);
-      setPlayerHand([...playerHand, drawnCard]);
+  const playerDiscardDraw = () => {
+    if (playerCanDraw) {
+      const drawnCard = discard.pop();
+      if (drawnCard) {
+        log(`Player drew ${serializeCard(drawnCard)} from the discard`);
+        setPlayerHand([...playerHand, drawnCard]);
+      }
+    }
+  };
+
+  const playerDiscard = (card) => {
+    if (playerCanDiscard) {
+      log(`Player discarded ${serializeCard(card)}`);
+      setPlayerHand(playerHand.filter((c) => c !== card));
+      setDiscard([...discard, card]);
     }
   };
 
@@ -128,10 +169,12 @@ function App() {
         <div>
           <strong>Deck</strong>
           <div
-            className={styles.deck}
+            className={`${styles.deck} ${
+              playerCanDraw ? styles.clickable : ""
+            }`}
             onMouseEnter={() => setAction("Draw from deck")}
             onMouseOut={resetAction}
-            onClick={playerDraw}
+            onClick={playerDeckDraw}
           ></div>
         </div>
 
@@ -139,12 +182,14 @@ function App() {
           <strong>Discard</strong>
           {discard.map((card, i) => (
             <CardDisplay
+              notClickable={!playerCanDraw}
               mouseEnter={() =>
                 setAction(`Draw ${serializeCard(card)} from discard`)
               }
               mouseOut={resetAction}
               key={serializeCard(card)}
               card={card}
+              onClick={playerDiscardDraw}
             />
           ))}
         </div>
@@ -153,7 +198,11 @@ function App() {
       <div className={styles.section}>
         <div>
           <strong>Player Hand</strong>
-          <Hand hand={playerHand} noClick={phase !== "discard"} />
+          <Hand
+            hand={playerHand}
+            noClick={phase !== "discard"}
+            onCardClick={playerDiscard}
+          />
         </div>
       </div>
     </div>

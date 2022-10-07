@@ -17,6 +17,9 @@
 .deck {
   composes: card from "./Card.module.css";
   background-color: salmon;
+}
+
+.clickable {
   cursor: pointer;
 }
 
