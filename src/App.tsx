@@ -7,6 +7,7 @@ import {
   draw,
   calcDeadwood,
   totalValue,
+  canPairOff,
 } from "./game";
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
@@ -19,7 +20,12 @@ type GameState = {
   compHand: Array<Card>;
   turn: "player" | "comp";
   phase: "draw" | "discard" | "maybeKnock" | "goOut";
+  round: number;
+  playerScore: number;
+  compScore: number;
 };
+
+type Turn = "player" | "comp";
 
 function emptyGameState(): GameState {
   const deck = generateDeck();
@@ -28,6 +34,9 @@ function emptyGameState(): GameState {
   const compHand = draw(deck, 10);
   const turn = "player";
   const phase = "draw";
+  const round = 0;
+  const playerScore = 0;
+  const compScore = 0;
   return {
     deck,
     discard,
@@ -35,6 +44,9 @@ function emptyGameState(): GameState {
     compHand,
     turn,
     phase,
+    round,
+    playerScore,
+    compScore,
   };
 }
 
@@ -43,13 +55,16 @@ function App() {
   const gameState: GameState = serializedGameState
     ? (JSON.parse(serializedGameState) as GameState)
     : emptyGameState();
-  const [deck] = useState(gameState.deck);
+  const [deck, setDeck] = useState(gameState.deck);
   const [discard, setDiscard] = useState(gameState.discard);
   const [playerHand, setPlayerHand] = useState(gameState.playerHand);
-  const [compHand] = useState(gameState.compHand);
+  const [compHand, setCompHand] = useState(gameState.compHand);
   const [turn, setTurn] = useState(gameState.turn);
   const [action, setAction] = useState("");
   const [phase, setPhase] = useState(gameState.phase);
+  const [round, setRound] = useState(gameState.round);
+  const [playerScore, setPlayerScore] = useState(gameState.playerScore);
+  const [compScore, setCompScore] = useState(gameState.compScore);
 
   const playerCanDraw = phase === "draw" && turn === "player";
   const playerCanDiscard = phase === "discard" && turn === "player";
@@ -64,6 +79,17 @@ function App() {
     }
   };
 
+  const nextRound = (winner: Turn) => {
+    setRound(round + 1);
+    const newDeck = generateDeck();
+    setDeck(generateDeck());
+    setDiscard(draw(newDeck, 1));
+    setPlayerHand(draw(newDeck, 10));
+    setCompHand(draw(newDeck, 10));
+    setTurn(winner);
+    setPhase("draw");
+  };
+
   useEffect(() => {
     localStorage.setItem(
       "gameState",
@@ -74,86 +100,84 @@ function App() {
         compHand,
         turn,
         phase,
+        round,
       })
     );
     const buffer = document.getElementById("log");
     if (buffer) buffer.scrollTop = buffer.scrollHeight;
-  }, [deck, discard, playerHand, compHand, turn, phase]);
+  }, [deck, discard, playerHand, compHand, turn, phase, round]);
 
   const resetAction = () => setAction("");
 
   const playerHasGin = calcDeadwood(playerHand).deadwood.length === 0;
 
+  const addPoints = (who: Turn, points: number) => {
+    if (who === "player") setPlayerScore(playerScore + points);
+    else setCompScore(compScore + points);
+  };
+
   const scoreAndGoOut = () => {
     setPhase("goOut");
-
-    const playerScore = totalValue(
-      calcDeadwood([
-        ...calcDeadwood(playerHand).deadwood,
-        ...calcDeadwood(compHand).groups.flatMap((c) => c),
-      ]).deadwood
-    );
-
-    const compScore = totalValue(
-      calcDeadwood([
-        ...calcDeadwood(compHand).deadwood,
-        ...calcDeadwood(playerHand).groups.flatMap((c) => c),
-      ]).deadwood
-    );
-
     log(`${turn} is going out, round end.`);
 
-    //undercut?
-    const undercut =
-      turn === "player" ? playerScore >= compScore : compScore >= playerScore;
+    const ender = turn;
+    const opp = (["player", "comp"] as Array<Turn>).filter(
+      (f) => f === ender
+    )[0];
+    const { groups: enderGroups, deadwood: enderDeadwood } =
+      calcDeadwood(playerHand);
+    const { groups: oppGroups, deadwood: oppDeadwood } =
+      calcDeadwood(playerHand);
+    const enderHand = turn === "player" ? playerHand : compHand;
+    const oppHand = turn === "player" ? compHand : playerHand;
+    const enderPairOffs = enderDeadwood.filter((f) => canPairOff(oppGroups, f));
+    const oppPairOffs = oppDeadwood.filter((f) => canPairOff(enderGroups, f));
+    const enderScore = totalValue(
+      calcDeadwood(enderHand.filter((f) => !oppPairOffs.includes(f))).deadwood
+    );
+    const oppScore = totalValue(
+      calcDeadwood(enderHand.filter((f) => !enderPairOffs.includes(f))).deadwood
+    );
+    const wasUndercut = enderScore >= oppScore;
+    const enderHasGin = calcDeadwood(enderHand).deadwood.length === 0;
+    const enderHasBigGin = enderHasGin && enderHand.length === 11;
+    const winner = enderHasGin ? ender : wasUndercut ? opp : ender;
 
-    if (turn === "player") {
-      if (playerHasGin) {
-        const points = totalValue(calcDeadwood(compHand).deadwood);
-        if (playerHand.length === 11) {
-          log("Big gin!");
-          log(`Player wins and gains ${points} + 31 = ${points + 31} points!`);
-        } else {
-          log("Gin!");
-          log(`Player wins and gains ${points} + 25 = ${points + 25} points!`);
-        }
-      } else if (undercut) {
-        log("Player was undercut!");
-        log(
-          `Comp wins the hand and gains ${playerScore - compScore + 25} points`
-        );
-      } else {
-        log(
-          `Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`
-        );
-        log(
-          `Player wins the hand, and gains ${compScore - playerScore} points`
-        );
-      }
+    const points = enderHasGin
+      ? totalValue(calcDeadwood(oppHand).deadwood)
+      : wasUndercut
+      ? enderScore - oppScore
+      : oppScore - enderScore;
+
+    const extraPoints = enderHasBigGin
+      ? 31
+      : enderHasGin || wasUndercut
+      ? 25
+      : 0;
+
+    if (enderHasBigGin) {
+      log("Big gin!");
+    } else if (enderHasGin) {
+      log("Gin!");
+    } else if (wasUndercut) {
+      log(`${ender} was undercut (${enderScore} > ${oppScore})!`);
     } else {
-      if (calcDeadwood(compHand).deadwood.length === 0) {
-        const points = totalValue(calcDeadwood(playerHand).deadwood);
-        if (compHand.length === 11) {
-          log("Big gin!");
-          log(`Comp wins and gains ${points} + 31 = ${points + 31} points!`);
-        } else {
-          log("Gin!");
-          log(`Comp wins and gains ${points} + 25 = ${points + 25} points!`);
-        }
-      } else if (undercut) {
-        log("Comp was undercut!");
-        log(
-          `Player wins the hand and gains ${
-            compScore - playerScore + 25
-          } points`
-        );
-      } else {
-        log(
-          `Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`
-        );
-        log(`Comp wins the hand, and gains ${playerScore - compScore} points`);
-      }
+      log(`Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`);
     }
+
+    if (extraPoints) {
+      log(
+        `${winner} wins, and gains ${points} + ${extraPoints} = ${
+          points + extraPoints
+        } points!`
+      );
+    } else {
+      log(`${winner} wins, and gains ${points} points!`);
+    }
+
+    addPoints(winner, points + extraPoints);
+
+    nextRound(winner);
   };
 
   const drawFrom = (cardSource: Array<Card>) => {
@@ -179,7 +203,6 @@ function App() {
 
   const playerDiscard = (card) => {
     if (playerCanDiscard) {
-      alert(`Player discarded ${serializeCard(card)}`);
       log(`Player discarded ${serializeCard(card)}`);
       const newHand = playerHand.filter((c) => c !== card);
       setPlayerHand(newHand);
@@ -207,10 +230,15 @@ function App() {
   return (
     <div className={styles.game}>
       <Helmet>
-        <title>{turn === "player" ? "Your turn!" : "Comp turn..."}</title>
+        <title>Gin Rummy, baby!</title>
       </Helmet>
 
       <div className={styles.section}>
+        <div>
+          <strong>Score:</strong>
+          <p>Player: {playerScore}</p>
+          <p>Comp: {compScore}</p>
+        </div>
         <div>
           <strong>Whose turn?</strong>
           <p>{turn}</p>
@@ -247,7 +275,7 @@ function App() {
             className={`${styles.deck} ${
               playerCanDraw ? styles.clickable : ""
             }`}
-            onMouseEnter={() => setAction("Draw from deck")}
+            onMouseEnter={() => playerCanDraw && setAction("Draw from deck")}
             onMouseOut={resetAction}
             onClick={playerDeckDraw}
           ></div>
@@ -255,10 +283,28 @@ function App() {
 
         <div>
           <strong>Discard</strong>
-          {discard.map((card, i) => (
+          {discard.length > 0 && (
             <CardDisplay
               notClickable={!playerCanDraw}
               mouseEnter={() =>
+                playerCanDraw &&
+                setAction(
+                  `Draw ${serializeCard(
+                    discard[discard.length - 1]
+                  )} from discard`
+                )
+              }
+              mouseOut={resetAction}
+              key={serializeCard(discard[discard.length - 1])}
+              card={discard[discard.length - 1]}
+              onClick={playerDiscardDraw}
+            />
+          )}
+          {/* {discard.map((card, i) => (
+            <CardDisplay
+              notClickable={!playerCanDraw}
+              mouseEnter={() =>
+                playerCanDraw &&
                 setAction(`Draw ${serializeCard(card)} from discard`)
               }
               mouseOut={resetAction}
@@ -266,7 +312,7 @@ function App() {
               card={card}
               onClick={playerDiscardDraw}
             />
-          ))}
+          ))} */}
         </div>
       </div>
 
@@ -279,7 +325,9 @@ function App() {
               ? "Gin!"
               : "Knock?"}
           </button>
-          <button onClick={computerTurn}>Keep Playing</button>
+          {!(playerHasGin && playerHand.length === 11) && (
+            <button onClick={computerTurn}>Keep Playing</button>
+          )}
         </div>
       )}
 

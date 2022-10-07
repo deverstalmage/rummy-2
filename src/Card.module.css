@@ -14,3 +14,7 @@
 .clickable {
   cursor: pointer;
 }
+
+.deemph {
+  opacity: 0.5;
+}

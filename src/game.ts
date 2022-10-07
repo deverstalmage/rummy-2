@@ -58,6 +58,13 @@ export const serializeCard = displayCard;
 //   };
 // }
 
+function shuffle(cards) {
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+}
+
 export function generateDeck(shuffled = true) {
   const deck: Array<Card> = [];
   for (let i = 1; i <= 13; i++) {
@@ -79,9 +86,11 @@ export function generateDeck(shuffled = true) {
     });
   }
 
-  return shuffled
-    ? deck.slice().sort((a, b) => 0.5 - Math.random())
-    : deck.slice();
+  const d = deck.slice();
+  if (shuffled) {
+    shuffle(d);
+  }
+  return d;
 }
 
 export function draw(deck: Array<Card>, n: number) {
@@ -310,6 +319,12 @@ export function shouldDraw(currentHand, drawCard) {
   const currentDeadwoodValue = totalValue(calcDeadwood(currentHand).deadwood);
 
   return newDeadwoodValue < currentDeadwoodValue;
+}
+
+export function canPairOff(groups: Array<Array<Card>>, card: Card) {
+  return groups.some(
+    (group) => calcDeadwood([...group, card]).deadwood.length === 0
+  );
 }
 
 // const testHand = [

@@ -8,17 +8,21 @@ export default function CardDisplay({
   mouseOut = () => {},
   onClick = () => {},
   notClickable = false,
+  deemphasized = false,
 }: {
   card: Card;
   mouseEnter?: () => void;
   mouseOut?: () => void;
   notClickable?: boolean;
   onClick?: () => void;
+  deemphasized?: boolean;
 }) {
   return (
     <div
       key={serializeCard(card)}
-      className={`${styles.card} ${notClickable ? "" : styles.clickable}`}
+      className={`${styles.card} ${notClickable ? "" : styles.clickable} ${
+        deemphasized ? styles.deemph : ""
+      }`}
       onMouseEnter={mouseEnter}
       onMouseOut={mouseOut}
       onClick={onClick}
