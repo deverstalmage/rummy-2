@@ -241,7 +241,7 @@ function removeHighestValueCard(cards) {
   return cards.filter((f) => f !== high);
 }
 
-function leastDeadwoodBeforeDiscard(cards) {
+export function leastDeadwoodBeforeDiscard(cards) {
   const hands: Array<Hand> = [];
   findHands(cards, hands);
 

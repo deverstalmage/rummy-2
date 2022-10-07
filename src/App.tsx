@@ -8,6 +8,9 @@ import {
   calcDeadwood,
   totalValue,
   canPairOff,
+  shouldDraw,
+  bestDiscard,
+  leastDeadwoodBeforeDiscard,
 } from "./game";
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
@@ -124,34 +127,39 @@ function App() {
     const opp = (["player", "comp"] as Array<Turn>).filter(
       (f) => f === ender
     )[0];
+
     const { groups: enderGroups, deadwood: enderDeadwood } =
       calcDeadwood(playerHand);
     const { groups: oppGroups, deadwood: oppDeadwood } =
       calcDeadwood(playerHand);
     const enderHand = turn === "player" ? playerHand : compHand;
     const oppHand = turn === "player" ? compHand : playerHand;
+
     const enderPairOffs = enderDeadwood.filter((f) => canPairOff(oppGroups, f));
     const oppPairOffs = oppDeadwood.filter((f) => canPairOff(enderGroups, f));
+
     const enderScore = totalValue(
       calcDeadwood(enderHand.filter((f) => !oppPairOffs.includes(f))).deadwood
     );
     const oppScore = totalValue(
       calcDeadwood(enderHand.filter((f) => !enderPairOffs.includes(f))).deadwood
     );
-    const wasUndercut = enderScore >= oppScore;
+
+    const enderWasUndercut = enderScore >= oppScore;
     const enderHasGin = calcDeadwood(enderHand).deadwood.length === 0;
     const enderHasBigGin = enderHasGin && enderHand.length === 11;
-    const winner = enderHasGin ? ender : wasUndercut ? opp : ender;
+
+    const winner = enderHasGin ? ender : enderWasUndercut ? opp : ender;
 
     const points = enderHasGin
       ? totalValue(calcDeadwood(oppHand).deadwood)
-      : wasUndercut
+      : enderWasUndercut
       ? enderScore - oppScore
       : oppScore - enderScore;
 
     const extraPoints = enderHasBigGin
       ? 31
-      : enderHasGin || wasUndercut
+      : enderHasGin || enderWasUndercut
       ? 25
       : 0;
 
@@ -159,20 +167,20 @@ function App() {
       log("Big gin!");
     } else if (enderHasGin) {
       log("Gin!");
-    } else if (wasUndercut) {
-      log(`${ender} was undercut (${enderScore} > ${oppScore})!`);
+    } else if (enderWasUndercut) {
+      log(`${ender.toUpperCase()} was undercut (${enderScore} > ${oppScore})!`);
     } else {
-      log(`Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`);
+      log(`Score with pair offs - PLAYER: ${playerScore}, COMP: ${compScore}`);
     }
 
     if (extraPoints) {
       log(
-        `${winner} wins, and gains ${points} + ${extraPoints} = ${
+        `${winner.toUpperCase()} wins, and gains ${points} + ${extraPoints} = ${
           points + extraPoints
         } points!`
       );
     } else {
-      log(`${winner} wins, and gains ${points} points!`);
+      log(`${winner.toUpperCase()} wins, and gains ${points} points!`);
     }
 
     addPoints(winner, points + extraPoints);
@@ -185,7 +193,7 @@ function App() {
       const drawnCard = cardSource.pop();
       if (drawnCard) {
         const newHand = [...playerHand, drawnCard];
-        log(`Player drew ${serializeCard(drawnCard)} from the deck`);
+        log(`PLAYER drew ${serializeCard(drawnCard)} from the deck`);
         setPlayerHand(newHand);
 
         // check for big gin
@@ -198,12 +206,15 @@ function App() {
     }
   };
 
+  const drawFromDiscard = () => {};
+  const drawFromDeck = () => {};
+
   const playerDeckDraw = () => drawFrom(deck);
   const playerDiscardDraw = () => drawFrom(discard);
 
   const playerDiscard = (card) => {
     if (playerCanDiscard) {
-      log(`Player discarded ${serializeCard(card)}`);
+      log(`PLAYER discarded ${serializeCard(card)}`);
       const newHand = playerHand.filter((c) => c !== card);
       setPlayerHand(newHand);
       setDiscard([...discard, card]);
@@ -216,10 +227,37 @@ function App() {
     }
   };
 
+  const topOfDiscard = discard.slice(-1)[0];
+
   const computerTurn = () => {
-    log("Computer's turn");
     setTurn("comp");
     setPhase("draw");
+
+    const drawFromDiscard = shouldDraw(compHand, topOfDiscard);
+    const newDiscard = discard.slice();
+    const cardDrawn = drawFromDiscard ? newDiscard.pop() : deck.pop();
+
+    let newCompHand = [...compHand, cardDrawn as Card];
+
+    // check for big gin
+    if (calcDeadwood(newCompHand).deadwood.length === 0) {
+      // big gin! go out
+      scoreAndGoOut();
+    } else {
+      const discarded = bestDiscard(
+        leastDeadwoodBeforeDiscard(newCompHand).deadwood,
+        discard
+      );
+      newDiscard.push(discarded);
+      newCompHand = newCompHand.filter((f) => f !== discarded) as Array<Card>;
+
+      setDiscard(newDiscard);
+      setCompHand(newCompHand);
+
+      if (!drawFromDiscard) {
+        setDeck(deck.filter((f) => f !== cardDrawn));
+      }
+    }
   };
 
   const reload = () => {
@@ -241,7 +279,7 @@ function App() {
         </div>
         <div>
           <strong>Whose turn?</strong>
-          <p>{turn}</p>
+          <p>{turn.toUpperCase()}</p>
           <p>
             <button onClick={reload}>reload</button>
           </p>
@@ -263,7 +301,7 @@ function App() {
 
       <div className={styles.section}>
         <div>
-          <strong>Computer Hand</strong>
+          <strong>COMP Hand</strong>
           <Hand hand={compHand} noClick={true} />
         </div>
       </div>
@@ -288,15 +326,11 @@ function App() {
               notClickable={!playerCanDraw}
               mouseEnter={() =>
                 playerCanDraw &&
-                setAction(
-                  `Draw ${serializeCard(
-                    discard[discard.length - 1]
-                  )} from discard`
-                )
+                setAction(`Draw ${serializeCard(topOfDiscard)} from discard`)
               }
               mouseOut={resetAction}
-              key={serializeCard(discard[discard.length - 1])}
-              card={discard[discard.length - 1]}
+              key={serializeCard(topOfDiscard)}
+              card={topOfDiscard}
               onClick={playerDiscardDraw}
             />
           )}
@@ -333,7 +367,7 @@ function App() {
 
       <div className={styles.section}>
         <div>
-          <strong>Player Hand</strong>
+          <strong>PLAYER Hand</strong>
           <Hand
             hand={playerHand}
             noClick={phase !== "discard"}
