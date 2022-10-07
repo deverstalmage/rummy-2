@@ -1,6 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import Hand from "./Hand";
-import { Card, generateDeck, serializeCard, draw } from "./game";
+import {
+  Card,
+  generateDeck,
+  serializeCard,
+  draw,
+  calcDeadwood,
+  totalValue,
+} from "./game";
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
 import { Helmet } from "react-helmet";
@@ -11,7 +18,7 @@ type GameState = {
   playerHand: Array<Card>;
   compHand: Array<Card>;
   turn: "player" | "comp";
-  phase: "draw" | "discard" | "goOut";
+  phase: "draw" | "discard" | "maybeKnock" | "goOut";
   log: Array<string>;
 };
 
@@ -43,7 +50,7 @@ function App() {
   const [discard, setDiscard] = useState(gameState.discard);
   const [playerHand, setPlayerHand] = useState(gameState.playerHand);
   const [compHand] = useState(gameState.compHand);
-  const [turn] = useState(gameState.turn);
+  const [turn, setTurn] = useState(gameState.turn);
   const [action, setAction] = useState("");
   const [phase, setPhase] = useState(gameState.phase);
   const [logLines, setLogLines] = useState(gameState.log);
@@ -51,12 +58,7 @@ function App() {
   const playerCanDraw = phase === "draw" && turn === "player";
   const playerCanDiscard = phase === "discard" && turn === "player";
 
-  const log = useCallback(
-    (newLine: string) => {
-      setLogLines([...logLines, newLine]);
-    },
-    [logLines]
-  );
+  const log = (newLine: string) => setLogLines([...logLines, newLine]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -73,52 +75,101 @@ function App() {
     );
     const buffer = document.getElementById("log");
     if (buffer) buffer.scrollTop = buffer.scrollHeight;
-
-    if (playerHand.length > 10 && playerCanDraw) {
-      log("Player discard phase");
-      setPhase("discard");
-    }
-  }, [
-    deck,
-    discard,
-    playerHand,
-    compHand,
-    turn,
-    phase,
-    logLines,
-    playerCanDraw,
-    log,
-  ]);
+  }, [deck, discard, playerHand, compHand, turn, phase, logLines]);
 
   const resetAction = () => setAction("");
 
-  const playerDeckDraw = () => {
-    if (playerCanDraw) {
-      const drawnCard = deck.pop();
-      if (drawnCard) {
-        log(`Player drew ${serializeCard(drawnCard)} from the deck`);
-        setPlayerHand([...playerHand, drawnCard]);
+  const scoreAndGoOut = () => {
+    setPhase("goOut");
+    const playerScore = totalValue(
+      calcDeadwood([
+        ...calcDeadwood(playerHand).deadwood,
+        ...calcDeadwood(compHand).groups.flatMap((c) => c),
+      ]).deadwood
+    );
+    const compScore = totalValue(
+      calcDeadwood([
+        ...calcDeadwood(compHand).deadwood,
+        ...calcDeadwood(playerHand).groups.flatMap((c) => c),
+      ]).deadwood
+    );
+    log(`${turn} is going out, round end.`);
+    log(`Score with pair offs - Player: ${playerScore}, Comp: ${compScore}`);
+
+    //undercut?
+    const undercut =
+      turn === "player" ? playerScore >= compScore : compScore >= playerScore;
+
+    if (turn === "player") {
+      if (undercut) {
+        log("Player was undercut!");
+        log(
+          `Comp wins the hand and gains ${playerScore - compScore + 25} points`
+        );
+      } else {
+        log(
+          `Player wins the hand, and gains ${compScore - playerScore} points`
+        );
+      }
+    } else {
+      if (undercut) {
+        log("Comp was undercut!");
+        log(
+          `Player wins the hand and gains ${
+            compScore - playerScore + 25
+          } points`
+        );
+      } else {
+        log(`Comp wins the hand, and gains ${playerScore - compScore} points`);
       }
     }
   };
 
-  const playerDiscardDraw = () => {
+  const drawFrom = (cardSource: Array<Card>) => {
     if (playerCanDraw) {
-      const drawnCard = discard.pop();
+      const drawnCard = cardSource.pop();
       if (drawnCard) {
-        log(`Player drew ${serializeCard(drawnCard)} from the discard`);
-        setPlayerHand([...playerHand, drawnCard]);
+        const newHand = [...playerHand, drawnCard];
+        log(`Player drew ${serializeCard(drawnCard)} from the deck`);
+        setPlayerHand(newHand);
+
+        // check for big gin
+        if (calcDeadwood(newHand).deadwood.length === 0) {
+          log("Big gin!");
+          scoreAndGoOut();
+        }
+
+        log("Player discard phase");
+        setPhase("discard");
       }
     }
   };
+
+  const playerDeckDraw = () => drawFrom(deck);
+  const playerDiscardDraw = () => drawFrom(discard);
 
   const playerDiscard = (card) => {
     if (playerCanDiscard) {
       log(`Player discarded ${serializeCard(card)}`);
-      setPlayerHand(playerHand.filter((c) => c !== card));
+      const newHand = playerHand.filter((c) => c !== card);
+      setPlayerHand(newHand);
       setDiscard([...discard, card]);
+
+      if (totalValue(calcDeadwood(newHand).deadwood) <= 10) {
+        log("Knock?");
+        setPhase("maybeKnock");
+      } else {
+        setPhase("draw");
+        setTurn("comp");
+      }
     }
   };
+
+  const knock = () => {
+    scoreAndGoOut();
+  };
+
+  const computerTurn = () => {};
 
   const reload = () => {
     localStorage.removeItem("gameState");
@@ -195,12 +246,23 @@ function App() {
         </div>
       </div>
 
+      {phase === "maybeKnock" && (
+        <div className={styles.section}>
+          <button onClick={knock}>Knock</button>
+          <button onClick={computerTurn}>Key Playing</button>
+        </div>
+      )}
+
       <div className={styles.section}>
         <div>
           <strong>Player Hand</strong>
           <Hand
             hand={playerHand}
             noClick={phase !== "discard"}
+            onMouseEnterCard={(card) =>
+              phase === "discard" && setAction(`Discard ${serializeCard(card)}`)
+            }
+            onMouseOutCard={resetAction}
             onCardClick={playerDiscard}
           />
         </div>

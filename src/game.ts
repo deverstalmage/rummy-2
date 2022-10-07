@@ -98,7 +98,7 @@ function cardValue(c) {
   return c.value;
 }
 
-function totalValue(cards) {
+export function totalValue(cards) {
   let total = 0;
   for (const card of cards) {
     total = total + cardValue(card);

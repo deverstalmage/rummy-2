@@ -1,5 +1,12 @@
-import React, { MouseEventHandler } from "react";
-import { Card, Hand, calcDeadwood, serializeCard, sortedCards } from "./game";
+import React from "react";
+import {
+  Card,
+  Hand,
+  calcDeadwood,
+  serializeCard,
+  sortedCards,
+  totalValue,
+} from "./game";
 import CardDisplay from "./Card";
 import styles from "./Hand.module.css";
 
@@ -48,6 +55,7 @@ export default function HandComponent({
               />
             ))}
         </div>
+        <div>deadwood value: {totalValue(calcDeadwood(hand).deadwood)}</div>
       </div>
     </div>
   );
