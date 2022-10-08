@@ -15,6 +15,7 @@ import {
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
 import { Helmet } from "react-helmet";
+import { cp } from "fs/promises";
 
 type GameState = {
   deck: Array<Card>;
@@ -22,10 +23,11 @@ type GameState = {
   playerHand: Array<Card>;
   compHand: Array<Card>;
   turn: "player" | "comp";
-  phase: "draw" | "discard" | "maybeKnock" | "goOut" | "turnEnd";
+  phase: "draw" | "discard" | "maybeKnock" | "goOut" | "turnEnd" | "endOfRound";
   round: number;
   playerScore: number;
   compScore: number;
+  wonLastRound: Turn | null;
 };
 
 type Turn = "player" | "comp";
@@ -40,6 +42,7 @@ function emptyGameState(): GameState {
   const round = 0;
   const playerScore = 0;
   const compScore = 0;
+  const wonLastRound = null;
   return {
     deck,
     discard,
@@ -50,6 +53,7 @@ function emptyGameState(): GameState {
     round,
     playerScore,
     compScore,
+    wonLastRound,
   };
 }
 
@@ -68,6 +72,7 @@ function App() {
   const [round, setRound] = useState(gameState.round);
   const [playerScore, setPlayerScore] = useState(gameState.playerScore);
   const [compScore, setCompScore] = useState(gameState.compScore);
+  const [wonLastRound, setWonLastRound] = useState(gameState.wonLastRound);
 
   const playerCanDraw = phase === "draw" && turn === "player";
   const playerCanDiscard = phase === "discard" && turn === "player";
@@ -82,19 +87,17 @@ function App() {
     }
   };
 
-  const nextRound = useCallback(
-    (winner: Turn) => {
-      setRound(round + 1);
-      const newDeck = generateDeck();
-      setDeck(generateDeck());
-      setDiscard(draw(newDeck, 1));
-      setPlayerHand(draw(newDeck, 10));
-      setCompHand(draw(newDeck, 10));
-      setTurn(winner);
-      setPhase("draw");
-    },
-    [round]
-  );
+  const nextRound = useCallback(() => {
+    log("Starting new round...");
+    setRound(round + 1);
+    const newDeck = generateDeck();
+    setDeck(generateDeck());
+    setDiscard(draw(newDeck, 1));
+    setPlayerHand(draw(newDeck, 10));
+    setCompHand(draw(newDeck, 10));
+    setTurn(wonLastRound as Turn);
+    setPhase("draw");
+  }, [round, wonLastRound]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -126,8 +129,6 @@ function App() {
   );
 
   const scoreAndGoOut = useCallback(() => {
-    setPhase("goOut");
-
     const ender = turn;
     log(`${ender.toUpperCase()} is going out, round end.`);
 
@@ -192,18 +193,9 @@ function App() {
 
     addPoints(winner, points + extraPoints);
 
-    log("Starting new round...");
-
-    // nextRound(winner);
-  }, [
-    addPoints,
-    compHand,
-    compScore,
-    nextRound,
-    playerHand,
-    playerScore,
-    turn,
-  ]);
+    setPhase("endOfRound");
+    setWonLastRound(winner);
+  }, [addPoints, compHand, compScore, playerHand, playerScore, turn]);
 
   const playerDrawFromDiscard = () => {
     const newDiscard = discard.slice();
@@ -278,7 +270,7 @@ function App() {
     // check for big gin
     if (calcDeadwood(newCompHand).deadwood.length === 0) {
       // big gin! go out
-      scoreAndGoOut();
+      setPhase("goOut");
     } else {
       const discarded = bestDiscard(
         leastDeadwoodBeforeDiscard(newCompHand).deadwood,
@@ -298,18 +290,22 @@ function App() {
       }
 
       if (totalValue(calcDeadwood(newCompHand).deadwood) <= 10) {
-        scoreAndGoOut();
+        setPhase("goOut");
       } else {
         setTurn("player");
         setPhase("draw");
       }
     }
-  }, [compHand, deck, discard, scoreAndGoOut, topOfDiscard]);
+  }, [compHand, deck, discard, topOfDiscard]);
 
   useEffect(() => {
     // detect last discard of the phase and kick off computerTurn
     if (phase === "turnEnd") computerTurn();
   }, [phase, computerTurn]);
+
+  useEffect(() => {
+    if (phase === "goOut") scoreAndGoOut();
+  }, [phase, scoreAndGoOut]);
 
   const reload = () => {
     localStorage.removeItem("gameState");
@@ -388,20 +384,38 @@ function App() {
         </div>
       </div>
 
-      {phase === "maybeKnock" && (
-        <div className={styles.section}>
-          <button onClick={scoreAndGoOut}>
-            {playerHasGin && playerHand.length === 11
-              ? "Big Gin!!"
-              : playerHasGin
-              ? "Gin!"
-              : "Knock?"}
-          </button>
-          {!(playerHasGin && playerHand.length === 11) && (
-            <button onClick={computerTurn}>Keep Playing</button>
-          )}
-        </div>
-      )}
+      <div className={styles.section}>
+        {phase === "maybeKnock" && (
+          <div>
+            <button onClick={() => setPhase("goOut")}>
+              {playerHasGin && playerHand.length === 11
+                ? "Big Gin!!"
+                : playerHasGin
+                ? "Gin!"
+                : "Knock?"}
+            </button>
+            {!(playerHasGin && playerHand.length === 11) && (
+              <button onClick={() => setPhase("turnEnd")}>Keep Playing</button>
+            )}
+          </div>
+        )}
+
+        {phase === "endOfRound" && playerScore >= 100 && compScore < 100 && (
+          <div>
+            <strong>PLAYER wins!</strong>
+            <button onClick={reload}>restart</button>
+          </div>
+        )}
+        {phase === "endOfRound" && compScore >= 100 && playerScore < 100 && (
+          <div>
+            <strong>COMP wins!</strong>
+            <button onClick={reload}>restart</button>
+          </div>
+        )}
+        {phase === "endOfRound" && compScore < 100 && playerScore < 100 && (
+          <button onClick={nextRound}>Next round!</button>
+        )}
+      </div>
 
       <div className={styles.section}>
         <div>
