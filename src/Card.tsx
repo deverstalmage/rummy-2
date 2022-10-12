@@ -9,6 +9,7 @@ export default function CardDisplay({
   onClick = () => {},
   notClickable = false,
   deemphasized = false,
+  faceDown = false,
 }: {
   card: Card;
   mouseEnter?: () => void;
@@ -16,8 +17,11 @@ export default function CardDisplay({
   notClickable?: boolean;
   onClick?: () => void;
   deemphasized?: boolean;
+  faceDown?: boolean;
 }) {
-  return (
+  return faceDown ? (
+    <div className={`${styles.faceDown} ${styles.card}`}></div>
+  ) : (
     <div
       key={serializeCard(card)}
       className={`${styles.card} ${notClickable ? "" : styles.clickable} ${

@@ -15,7 +15,6 @@ import {
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
 import { Helmet } from "react-helmet";
-import { cp } from "fs/promises";
 
 type GameState = {
   deck: Array<Card>;
@@ -87,18 +86,6 @@ function App() {
     }
   };
 
-  const nextRound = useCallback(() => {
-    log("Starting new round...");
-    setRound(round + 1);
-    const newDeck = generateDeck();
-    setDeck(generateDeck());
-    setDiscard(draw(newDeck, 1));
-    setPlayerHand(draw(newDeck, 10));
-    setCompHand(draw(newDeck, 10));
-    setTurn(wonLastRound as Turn);
-    setPhase("draw");
-  }, [round, wonLastRound]);
-
   useEffect(() => {
     localStorage.setItem(
       "gameState",
@@ -110,11 +97,25 @@ function App() {
         turn,
         phase,
         round,
+        playerScore,
+        compScore,
+        wonLastRound,
       })
     );
     const buffer = document.getElementById("log");
     if (buffer) buffer.scrollTop = buffer.scrollHeight;
-  }, [deck, discard, playerHand, compHand, turn, phase, round]);
+  }, [
+    deck,
+    discard,
+    playerHand,
+    compHand,
+    playerScore,
+    compScore,
+    turn,
+    phase,
+    round,
+    wonLastRound,
+  ]);
 
   const resetAction = () => setAction("");
 
@@ -133,7 +134,7 @@ function App() {
     log(`${ender.toUpperCase()} is going out, round end.`);
 
     const opp = (["player", "comp"] as Array<Turn>).filter(
-      (f) => f === ender
+      (f) => f !== ender
     )[0];
 
     const { groups: enderGroups, deadwood: enderDeadwood } =
@@ -178,7 +179,9 @@ function App() {
     } else if (enderWasUndercut) {
       log(`${ender.toUpperCase()} was undercut (${enderScore} > ${oppScore})!`);
     } else {
-      log(`Score with pair offs - PLAYER: ${playerScore}, COMP: ${compScore}`);
+      log(
+        `Score with pair offs - ${ender}: ${enderScore}, ${opp}: ${oppScore}`
+      );
     }
 
     if (extraPoints) {
@@ -195,7 +198,7 @@ function App() {
 
     setPhase("endOfRound");
     setWonLastRound(winner);
-  }, [addPoints, compHand, compScore, playerHand, playerScore, turn]);
+  }, [addPoints, compHand, playerHand, turn]);
 
   const playerDrawFromDiscard = () => {
     const newDiscard = discard.slice();
@@ -259,11 +262,11 @@ function App() {
     const newDeck = deck.slice();
     const cardDrawn = drawFromDiscard ? newDiscard.pop() : newDeck.pop();
 
-    log(
-      `COMP drew ${serializeCard(cardDrawn)} from ${
-        drawFromDiscard ? "the discard" : "the deck"
-      }`
-    );
+    if (drawFromDiscard) {
+      log(`COMP drew ${serializeCard(cardDrawn)} from the discard`);
+    } else {
+      log(`COMP drew from the deck`);
+    }
 
     let newCompHand = [...compHand, cardDrawn as Card];
 
@@ -298,14 +301,24 @@ function App() {
     }
   }, [compHand, deck, discard, topOfDiscard]);
 
-  useEffect(() => {
-    // detect last discard of the phase and kick off computerTurn
-    if (phase === "turnEnd") computerTurn();
-  }, [phase, computerTurn]);
+  const nextRound = useCallback(() => {
+    log("Starting new round...");
+    setRound(round + 1);
+    const newDeck = generateDeck();
+    setDiscard(draw(newDeck, 1));
+    setPlayerHand(draw(newDeck, 10));
+    setCompHand(draw(newDeck, 10));
+    setDeck(generateDeck());
+    setTurn(wonLastRound as Turn);
+    setPhase("draw");
+  }, [round, wonLastRound]);
 
   useEffect(() => {
-    if (phase === "goOut") scoreAndGoOut();
-  }, [phase, scoreAndGoOut]);
+    // detect last discard of the phase and kick off computerTurn
+    if (phase === "turnEnd" || (turn === "comp" && phase === "draw"))
+      computerTurn();
+    else if (phase === "goOut") scoreAndGoOut();
+  }, [phase, turn, computerTurn, scoreAndGoOut]);
 
   const reload = () => {
     localStorage.removeItem("gameState");
@@ -323,6 +336,7 @@ function App() {
           <strong>Score:</strong>
           <p>Player: {playerScore}</p>
           <p>Comp: {compScore}</p>
+          <p>round {round + 1}</p>
         </div>
         <div>
           <strong>Whose turn?</strong>
@@ -349,7 +363,11 @@ function App() {
       <div className={styles.section}>
         <div>
           <strong>COMP Hand</strong>
-          <Hand hand={compHand} noClick={true} />
+          <Hand
+            hand={compHand}
+            noClick={true}
+            hideHand={phase !== "goOut" && phase !== "endOfRound"}
+          />
         </div>
       </div>
 
@@ -364,6 +382,7 @@ function App() {
             onMouseOut={resetAction}
             onClick={() => playerCanDraw && playerDrawFromDeck()}
           ></div>
+          <div>{deck.length} cards</div>
         </div>
 
         <div>

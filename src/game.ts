@@ -211,20 +211,6 @@ function findHands(
 const eqSet = (xs, ys) =>
   xs.size === ys.size && [...xs].every((x) => ys.has(x));
 
-// function getHandsBeforeDiscard(cards) {
-//   const hands: Array<Hand> = [];
-//   findHands(cards, hands);
-
-//   const u = new Map();
-//   hands.filter(f => f.deadwood.length > 0).forEach(hand => {
-//     const s = new Set(hand.deadwood);
-//     if (![...u.keys()].find(h => eqSet(h, s))) {
-//       u.set(s, hand);
-//     }
-//   })
-//   return [...u.values()];
-// }
-
 function highestValueCard(cards) {
   const c = cards.slice();
   let high = c[0];
@@ -326,45 +312,3 @@ export function canPairOff(groups: Array<Array<Card>>, card: Card) {
     (group) => calcDeadwood([...group, card]).deadwood.length === 0
   );
 }
-
-// const testHand = [
-//   { value: 1, suit: 'spade' },
-//   { value: 1, suit: 'club' },
-//   { value: 1, suit: 'diamond' },
-//   { value: 1, suit: 'heart' },
-//   { value: 2, suit: 'club' },
-//   { value: 2, suit: 'diamond' },
-//   { value: 2, suit: 'heart' },
-//   { value: 3, suit: 'club' },
-//   { value: 3, suit: 'diamond' },
-//   { value: 3, suit: 'heart' },
-// ];
-
-// function run() {
-//   const draw = (n) => [];
-//   const compHand = draw(10);
-//   const discard = draw(1);
-//   const topOfDiscard = discard[discard.length - 1];
-//   render('Comp Hand');
-//   render(displayHand(calcDeadwood(compHand)));
-//   render(`Top of Discard: ${displayCard(topOfDiscard)}`);
-//   render(`All discarded: ${discard.map(d => displayCard(d)).reverse()}`);
-
-//   const drawFromDiscard = shouldDraw(compHand, topOfDiscard);
-//   render(`Should take from discard? ${drawFromDiscard ? 'Yes' : 'No'}`);
-
-//   const cardDrawn = drawFromDiscard ? discard.pop() : shuffledDeck.pop();
-//   render(`Drawing: ${displayCard(cardDrawn)}`);
-
-//   let newCompHand = [...compHand, cardDrawn];
-//   const discarded = bestDiscard(leastDeadwoodBeforeDiscard(newCompHand).deadwood, discard);
-//   newCompHand = newCompHand.filter(f => f !== discarded);
-//   discard.push(discarded);
-//   render(`Discarding: ${displayCard(discarded)}`);
-
-//   render('New comp hand');
-//   render(displayHand(calcDeadwood(newCompHand)));
-
-//   const canKnock = totalValue(calcDeadwood(newCompHand).deadwood) <= 10;
-//   render(`Knock? ${canKnock ? 'Yes' : 'No'}`);
-// }

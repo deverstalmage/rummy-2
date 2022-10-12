@@ -11,6 +11,10 @@
   cursor: not-allowed;
 }
 
+.faceDown {
+  background-color: salmon;
+}
+
 .clickable {
   cursor: pointer;
 }
