@@ -22,7 +22,7 @@ type GameState = {
   playerHand: Array<Card>;
   compHand: Array<Card>;
   turn: "player" | "comp";
-  phase: "draw" | "discard" | "maybeKnock" | "goOut" | "turnEnd" | "endOfRound";
+  phase: "draw" | "discard" | "maybeKnock" | "goOut" | "endOfRound";
   round: number;
   playerScore: number;
   compScore: number;
@@ -246,7 +246,8 @@ function App() {
       if (totalValue(calcDeadwood(newHand).deadwood) <= 10) {
         setPhase("maybeKnock");
       } else {
-        setPhase("turnEnd");
+        setTurn("comp");
+        setPhase("draw");
       }
     }
   };
@@ -254,9 +255,6 @@ function App() {
   const topOfDiscard = discard.slice(-1)[0];
 
   const computerTurn = useCallback(() => {
-    setTurn("comp");
-    setPhase("draw");
-
     const drawFromDiscard = shouldDraw(compHand, topOfDiscard);
     const newDiscard = discard.slice();
     const newDeck = deck.slice();
@@ -308,15 +306,14 @@ function App() {
     setDiscard(draw(newDeck, 1));
     setPlayerHand(draw(newDeck, 10));
     setCompHand(draw(newDeck, 10));
-    setDeck(generateDeck());
+    setDeck(newDeck);
     setTurn(wonLastRound as Turn);
     setPhase("draw");
   }, [round, wonLastRound]);
 
   useEffect(() => {
     // detect last discard of the phase and kick off computerTurn
-    if (phase === "turnEnd" || (turn === "comp" && phase === "draw"))
-      computerTurn();
+    if (turn === "comp" && phase === "draw") computerTurn();
     else if (phase === "goOut") scoreAndGoOut();
   }, [phase, turn, computerTurn, scoreAndGoOut]);
 
@@ -414,7 +411,14 @@ function App() {
                 : "Knock?"}
             </button>
             {!(playerHasGin && playerHand.length === 11) && (
-              <button onClick={() => setPhase("turnEnd")}>Keep Playing</button>
+              <button
+                onClick={() => {
+                  setTurn("comp");
+                  setPhase("draw");
+                }}
+              >
+                Keep Playing
+              </button>
             )}
           </div>
         )}
