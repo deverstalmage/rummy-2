@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { CSSTransition } from "react-transition-group";
 import Hand from "./Hand";
 import {
   Card,
@@ -15,6 +16,7 @@ import {
 import CardDisplay from "./Card";
 import styles from "./App.module.css";
 import { Helmet } from "react-helmet";
+import "./Hand.animations.css";
 
 type GameState = {
   deck: Array<Card>;
@@ -85,6 +87,9 @@ function App() {
       buffer.appendChild(li);
     }
   };
+
+  const discardRef = useRef(null);
+  const testRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(
@@ -267,6 +272,7 @@ function App() {
     }
 
     let newCompHand = [...compHand, cardDrawn as Card];
+    setCompHand(newCompHand);
 
     // check for big gin
     if (calcDeadwood(newCompHand).deadwood.length === 0) {
@@ -368,6 +374,21 @@ function App() {
         </div>
       </div>
 
+      {/* <div className={styles.section}>
+        <CSSTransition
+          onEnter={() => {
+            // debugger;
+          }}
+          nodeRef={testRef}
+          timeout={500}
+          in={phase === "draw"}
+          classNames="card"
+          unmountOnExit={true}
+        >
+          <h1 ref={testRef}>animation test</h1>
+        </CSSTransition>
+      </div> */}
+
       <div className={styles.section}>
         <div>
           <strong>Deck</strong>
@@ -385,6 +406,17 @@ function App() {
         <div>
           <strong>Discard</strong>
           {discard.length > 0 && (
+            // <CSSTransition
+            //   onEnter={() => {
+            //     // debugger;
+            //   }}
+            //   nodeRef={discardRef}
+            //   timeout={500}
+            //   in={discard.length > 0}
+            //   classNames="card"
+            //   unmountOnExit={true}
+            // >
+            //   <div ref={discardRef}>
             <CardDisplay
               notClickable={!playerCanDraw}
               mouseEnter={() =>
@@ -396,6 +428,8 @@ function App() {
               card={topOfDiscard}
               onClick={() => playerCanDraw && playerDrawFromDiscard()}
             />
+            // </div>
+            // </CSSTransition>
           )}
         </div>
       </div>
